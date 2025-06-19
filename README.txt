@@ -53,6 +53,9 @@ PDF 多選區裁切工具（10x15cm）
 請在命令列輸入：
 pip install pymupdf pillow
 
+【封裝指令】
+pyinstaller --onefile --windowed --name pdf-cropper pdf-cropper.py
+
 ----------------------------
 【注意事項】
 - 匯出時使用解析度 300dpi，品質足以列印。
