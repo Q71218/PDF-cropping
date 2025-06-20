@@ -53,7 +53,7 @@ PDF 多選區裁切工具（10x15cm）  設計：DY
 請在 命令提示字元 輸入：
 pip install pymupdf pillow
 
-【封裝指令】
+【封裝成EXE的指令】
 pyinstaller --onefile --windowed --name pdf-cropper pdf-cropper.py
 
 ----------------------------
