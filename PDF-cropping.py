@@ -43,7 +43,6 @@ class PDFCropper:
         self.master = master
         self.master.bind("<Configure>", lambda e: self.show_page())
 
-        # 顯示設計者資訊於視窗底部
         tk.Label(master, text="Design by DY", anchor="center", fg="gray").pack(side=tk.BOTTOM, fill=tk.X)
 
     def load_pdf(self):
@@ -71,6 +70,11 @@ class PDFCropper:
             return
         page = self.doc.load_page(self.current_page_index)
         zoom_x, zoom_y = self.calculate_zoom_to_fit(page)
+
+        # 新增：將縮放比例設為預設 90%
+        zoom_x *= 0.9
+        zoom_y *= 0.9
+
         pix = page.get_pixmap(matrix=fitz.Matrix(zoom_x, zoom_y))
         image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
         self.tk_img = ImageTk.PhotoImage(image)
@@ -152,21 +156,27 @@ class PDFCropper:
         base_dir = os.path.dirname(self.pdf_path)
         pages = range(len(self.doc)) if self.enable_batch.get() else [self.current_page_index]
 
-        total_crops = len(self.crop_rects) * len(pages)
-        base_name = os.path.splitext(os.path.basename(self.pdf_path))[0] + f"_已裁切_{total_crops}頁.pdf"
+        base_name = os.path.splitext(os.path.basename(self.pdf_path))[0] + f"_已裁切.pdf"
         save_path = os.path.join(base_dir, base_name)
 
         output_pdf = fitz.open()
         width_pt = 10 / 2.54 * 72
         height_pt = 15 / 2.54 * 72
 
+        count = 0
         for pno in pages:
             page = self.doc.load_page(pno)
             for rect in self.crop_rects:
                 crop = fitz.Rect(*rect)
                 pix = page.get_pixmap(clip=crop, dpi=300)
+
+                avg_color = sum(pix.samples) / len(pix.samples)
+                if avg_color > 250:
+                    continue
+
                 img = fitz.Pixmap(pix, 0) if pix.alpha else pix
                 new_page = output_pdf.new_page(width=width_pt, height=height_pt)
+
                 img_rect = fitz.Rect(0, 0, img.width * 72 / 300, img.height * 72 / 300)
                 x_offset = (width_pt - img_rect.width) / 2
                 y_offset = (height_pt - img_rect.height) / 2
@@ -176,9 +186,26 @@ class PDFCropper:
                 img_rect.y1 += y_offset
                 new_page.insert_image(img_rect, pixmap=img)
 
+                text = "拆封請全程錄影"
+                font_size = 12
+                text_rect = fitz.Rect(0, img_rect.y1 + 10, width_pt, height_pt)
+                if text_rect.y1 + font_size < height_pt:
+                    try:
+                        new_page.insert_textbox(text_rect, text,
+                                                fontname="MicrosoftJhengHei",
+                                                fontsize=font_size,
+                                                color=(1, 0, 0),
+                                                align=1)
+                    except RuntimeError as e:
+                        messagebox.showwarning("字型錯誤", f"無法插入中文字：{e}")
+                count += 1
+
         try:
-            output_pdf.save(save_path)
-            messagebox.showinfo("完成", f"已匯出 {total_crops} 頁裁切結果：\n{save_path}")
+            if count == 0:
+                messagebox.showinfo("結果", "沒有匯出任何頁面（所有裁切區域皆為空白）")
+            else:
+                output_pdf.save(save_path)
+                messagebox.showinfo("完成", f"已匯出 {count} 頁裁切結果：\n{save_path}")
         except Exception as e:
             messagebox.showerror("錯誤", f"無法儲存檔案：{e}")
         finally:
